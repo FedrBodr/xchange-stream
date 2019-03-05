@@ -34,11 +34,11 @@ public enum StreamingExchangeFactory {
      * Create an Exchange object without default ExchangeSpecification
      * <p>
      * The factory is parameterised with the name of the exchange implementation class. This must be a class extending
-     * {@link org.knowm.xchange.Exchange}.
+     * {@link Exchange}.
      * </p>
      *
      * @param exchangeClassName the fully-qualified class name of the exchange
-     * @return a new exchange instance configured with the default {@link org.knowm.xchange.ExchangeSpecification}
+     * @return a new exchange instance configured with the default {@link ExchangeSpecification}
      */
     public StreamingExchange createExchangeWithoutSpecification(String exchangeClassName) {
 
@@ -76,11 +76,11 @@ public enum StreamingExchangeFactory {
      * Create an Exchange object with default ExchangeSpecification
      * <p>
      * The factory is parameterised with the name of the exchange implementation class. This must be a class extending
-     * {@link org.knowm.xchange.Exchange}.
+     * {@link Exchange}.
      * </p>
      *
      * @param exchangeClassName the fully-qualified class name of the exchange
-     * @return a new exchange instance configured with the default {@link org.knowm.xchange.ExchangeSpecification}
+     * @return a new exchange instance configured with the default {@link ExchangeSpecification}
      */
     public StreamingExchange createExchange(String exchangeClassName) {
 

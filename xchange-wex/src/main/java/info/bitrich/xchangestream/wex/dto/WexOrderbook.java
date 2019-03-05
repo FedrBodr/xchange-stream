@@ -18,7 +18,7 @@ public class WexOrderbook {
 
     public WexOrderbook() {
         asks = new TreeMap<>();
-        bids = new TreeMap<>(java.util.Collections.reverseOrder());
+        bids = new TreeMap<>(Collections.reverseOrder());
     }
 
     public WexOrderbook(OrderBook orderBook) {

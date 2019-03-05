@@ -34,8 +34,31 @@ public class BitmexStreamingMarketDataService implements StreamingMarketDataServ
 
     @Override
     public Observable<OrderBook> getOrderBook(CurrencyPair currencyPair, Object... args) {
-        String instrument = currencyPair.base.toString() + currencyPair.counter.toString();
+        String instrument = currencyPair.base.getCurrencyCode() + currencyPair.counter.getCurrencyCode();
         String channelName = String.format("orderBookL2:%s", instrument);
+
+        return streamingService.subscribeBitmexChannel(channelName).map(s -> {
+            BitmexOrderbook orderbook;
+            String action = s.getAction();
+            if (action.equals("partial")) {
+                orderbook = s.toBitmexOrderbook();
+                orderbooks.put(currencyPair, orderbook);
+            } else {
+                orderbook = orderbooks.get(currencyPair);
+                //ignore updates until first "partial"
+                if (orderbook == null) {
+                    return null;
+                }
+                BitmexLimitOrder[] levels = s.toBitmexOrderbookLevels();
+                orderbook.updateLevels(levels, action);
+            }
+
+            return orderbook.toOrderbook();
+        });
+    }
+
+    public Observable<OrderBook> getUserOrder(CurrencyPair currencyPair, Object... args) {
+        String channelName = "order";
 
         return streamingService.subscribeBitmexChannel(channelName).map(s -> {
             BitmexOrderbook orderbook;

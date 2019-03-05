@@ -1,34 +1,38 @@
 package info.bitrich.xchangestream.bitmex;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-
-import io.netty.handler.codec.http.websocketx.extensions.WebSocketClientExtensionHandler;
-import io.netty.handler.codec.http.websocketx.extensions.compression.WebSocketClientCompressionHandler;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-
 import info.bitrich.xchangestream.bitmex.dto.BitmexWebSocketSubscriptionMessage;
 import info.bitrich.xchangestream.bitmex.dto.BitmexWebSocketTransaction;
 import info.bitrich.xchangestream.service.netty.JsonNettyStreamingService;
+import io.netty.handler.codec.http.websocketx.extensions.WebSocketClientExtensionHandler;
+import io.reactivex.Completable;
 import io.reactivex.Observable;
+import org.knowm.xchange.ExchangeSpecification;
+import org.knowm.xchange.bitmex.service.BitmexDigest;
+import org.knowm.xchange.utils.nonce.ExpirationTimeFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import si.mazi.rescu.SynchronizedValueFactory;
+
+import java.io.IOException;
 
 /**
  * Created by Lukas Zaoralek on 13.11.17.
  */
 public class BitmexStreamingService extends JsonNettyStreamingService {
     private static final Logger LOG = LoggerFactory.getLogger(BitmexStreamingService.class);
+    private ExchangeSpecification exchangeSpecification;
 
     public BitmexStreamingService(String apiUrl) {
         super(apiUrl, Integer.MAX_VALUE);
+        this.exchangeSpecification = null;
+    }
+    public BitmexStreamingService(String apiUrl, ExchangeSpecification exchangeSpecification) {
+        super(apiUrl, Integer.MAX_VALUE);
+        this.exchangeSpecification = exchangeSpecification;
     }
 
-	 @Override
+    @Override
     protected void handleMessage(JsonNode message) {
         if (message.has("info") || message.has("success")) {
             return;
@@ -36,6 +40,7 @@ public class BitmexStreamingService extends JsonNettyStreamingService {
         if (message.has("error")) {
             String error = message.get("error").asText();
             LOG.error("Error with message: " + error);
+            LOG.debug("Error with message: " + message.toString());
             return;
         }
 
@@ -52,14 +57,26 @@ public class BitmexStreamingService extends JsonNettyStreamingService {
             BitmexWebSocketTransaction transaction = objectMapper.treeToValue(s, BitmexWebSocketTransaction.class);
             return transaction;
         })
+        .share();
+    }
+
+    public Observable<BitmexWebSocketTransaction> subscribeBitmexAuthChannel(String channelName) {
+        return subscribeChannel(channelName).map(s -> {
+            BitmexWebSocketTransaction transaction = objectMapper.treeToValue(s, BitmexWebSocketTransaction.class);
+            return transaction;
+        })
                 .share();
     }
 
     @Override
     protected String getChannelNameFromMessage(JsonNode message) throws IOException {
-        String instrument = message.get("data").get(0).get("symbol").asText();
-        String table = message.get("table").asText();
-        return String.format("%s:%s", table, instrument);
+        final JsonNode symbolNode = message.get("data").get(0).get("symbol");
+        final JsonNode tableNode = message.get("table");
+
+        if (symbolNode == null)
+            return tableNode.asText();
+        else
+            return String.format("%s:%s", tableNode.asText(), symbolNode.asText());
     }
 
     @Override
@@ -73,4 +90,39 @@ public class BitmexStreamingService extends JsonNettyStreamingService {
         BitmexWebSocketSubscriptionMessage subscribeMessage = new BitmexWebSocketSubscriptionMessage("unsubscribe", new String[]{});
         return objectMapper.writeValueAsString(subscribeMessage);
     }
+
+    /* Authenticate */
+    public void authenticate(){
+        try {
+            sendMessage(getAuthenticateMessage());
+        } catch (IOException e) {
+            LOG.error("Exception occurred while auth msg send", e);
+        }
+    }
+
+    private String getAuthenticateMessage() throws IOException {
+//        connect().blockingAwait();
+
+        BitmexDigest bitmexDigest = BitmexDigest.createInstance(exchangeSpecification.getSecretKey(), exchangeSpecification.getApiKey() );
+        if (bitmexDigest == null)
+            return null;
+
+        SynchronizedValueFactory<Long> nonceFactory = new ExpirationTimeFactory(30);
+
+        long nonce = nonceFactory.createValue();
+        String payload = "GET/realtime" + nonce;
+        String digestString = bitmexDigest.digestString(payload);
+
+        BitmexWebSocketSubscriptionMessage subscribeMessage =
+                new BitmexWebSocketSubscriptionMessage("authKeyExpires",
+                new Object[]{exchangeSpecification.getApiKey(), nonce, digestString});
+
+        //sendMessage( );
+        return objectMapper.writeValueAsString(subscribeMessage);
+    }
+
+	@Override
+	protected Completable openConnection() {
+		return null;
+	}
 }
