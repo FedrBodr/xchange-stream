@@ -6,6 +6,8 @@ import info.bitrich.xchangestream.bitmex.dto.BitmexTicker;
 import info.bitrich.xchangestream.bitmex.dto.BitmexTrade;
 import info.bitrich.xchangestream.core.StreamingMarketDataService;
 import io.reactivex.Observable;
+import org.knowm.xchange.bitmex.dto.trade.BitmexOrder;
+import org.knowm.xchange.bitmex.dto.trade.BitmexPosition;
 import org.knowm.xchange.currency.CurrencyPair;
 import org.knowm.xchange.dto.marketdata.OrderBook;
 import org.knowm.xchange.dto.marketdata.Ticker;
@@ -53,6 +55,7 @@ public class BitmexStreamingMarketDataService implements StreamingMarketDataServ
                 orderbook.updateLevels(levels, action);
             }
 
+
             return orderbook.toOrderbook();
         });
     }
@@ -62,6 +65,13 @@ public class BitmexStreamingMarketDataService implements StreamingMarketDataServ
         String channelName = String.format("quote:%s", instrument);
 
         return streamingService.subscribeBitmexChannel(channelName).map(s -> s.toBitmexTicker());
+    }
+    public Observable<BitmexPosition> getRawPosition() {
+        return streamingService.subscribeBitmexChannel("position").map(s -> s.toBitmexPosition());
+    }
+
+    public Observable<BitmexOrder> getRawOrder() {
+        return streamingService.subscribeBitmexChannel("order").map(s -> s.toBitmexOrder());
     }
 
     @Override
