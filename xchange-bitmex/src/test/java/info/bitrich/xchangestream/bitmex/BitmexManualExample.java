@@ -1,16 +1,17 @@
 package info.bitrich.xchangestream.bitmex;
 
-import info.bitrich.xchangestream.core.ProductSubscription;
-import info.bitrich.xchangestream.core.StreamingExchange;
 import info.bitrich.xchangestream.core.StreamingExchangeFactory;
-import info.bitrich.xchangestream.service.ConnectableService;
 import org.apache.commons.lang3.StringUtils;
 import org.knowm.xchange.ExchangeSpecification;
+import org.knowm.xchange.bitmex.BitmexException;
+import org.knowm.xchange.bitmex.dto.marketdata.BitmexPrivateOrder;
 import org.knowm.xchange.bitmex.dto.trade.BitmexOrder;
 import org.knowm.xchange.bitmex.dto.trade.BitmexPosition;
 import org.knowm.xchange.currency.CurrencyPair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import javax.naming.NoPermissionException;
 
 /**
  * Created by Lukas Zaoralek on 13.11.17.
@@ -18,7 +19,8 @@ import org.slf4j.LoggerFactory;
 public class BitmexManualExample {
 
     private static Logger LOG;
-    private static boolean isNeedStop;
+    private static boolean doWork;
+    private static BitmexStreamingExchange exchange;
 
     static {
         System.setProperty("log4j.configurationFile","C:\\projects\\xchange-stream\\xchange-bitmex\\test\\resources\\log4j2.xml");
@@ -39,11 +41,9 @@ public class BitmexManualExample {
                 BitmexStreamingExchange.class.getName()).getDefaultExchangeSpecification();
         spec.setApiKey(apiKey);
         spec.setSecretKey(apiSecret);
-        BitmexStreamingExchange exchange = (BitmexStreamingExchange) StreamingExchangeFactory.INSTANCE.createExchange(spec);
+        exchange = (BitmexStreamingExchange) StreamingExchangeFactory.INSTANCE.createExchange(spec);
         exchange.connect().blockingAwait();
 
-        final BitmexStreamingMarketDataService streamingMarketDataService = (BitmexStreamingMarketDataService) exchange.getStreamingMarketDataService();
-        CurrencyPair xbtUsd = CurrencyPair.XBT_USD;
         /*streamingMarketDataService.getOrderBook(xbtUsd).subscribe(orderBook -> {
             if (!orderBook.getAsks().isEmpty()) {
                 LOG.info("First ask: {}", orderBook.getAsks().get(0));
@@ -65,12 +65,16 @@ public class BitmexManualExample {
                 .subscribe(trade -> LOG.info("TRADE: {}", trade),
                         throwable -> LOG.error("ERROR in getting trades: ", throwable));*/
 
-        /*streamingMarketDataService.getRawPosition().subscribe(BitmexManualExample::handlePositionMessage, throwable -> LOG.error("ERROR in getting position: ", throwable));*/
-        streamingMarketDataService.getRawOrder().subscribe(BitmexManualExample::handleOrderMessage, BitmexManualExample::handleErrorMessage);
-        isNeedStop = true;
+		/*streamingMarketDataService.getRawPosition().subscribe(BitmexManualExample::handlePositionMessage, throwable -> LOG.error("ERROR in getting position: ", throwable));*/
+		final BitmexStreamingMarketDataService streamingMarketDataService = (BitmexStreamingMarketDataService) exchange.getStreamingMarketDataService();
+		CurrencyPair xbtUsd = CurrencyPair.XBT_USD;
+
+		streamingMarketDataService.getRawOrder().subscribe(BitmexManualExample::handleOrderMessage, BitmexManualExample::handleSomeException);
+
+        doWork = true;
         try {
-            while(isNeedStop) {
-                Thread.sleep(25000);
+            while(doWork) {
+                Thread.sleep(10000);
             }
         } catch (InterruptedException e) {
             e.printStackTrace();
@@ -80,12 +84,24 @@ public class BitmexManualExample {
         exchange.disconnect().blockingAwait();
     }
 
-	private static void handleErrorMessage(Throwable throwable) {
-		LOG.error("ERROR in getting position: ", throwable);
+	private static void handleErrorMessage(BitmexException bitmexException) {
+		LOG.error("ERROR in getting position: ", bitmexException);
 	}
 
-	private static void handleOrderMessage(BitmexOrder bitmexOrder) {
-        LOG.info("position: {}", bitmexOrder);
+	private static void handleSomeException(Throwable throwable) {
+    	if(throwable instanceof NoPermissionException){
+    		/* do resubscribe to all private channels or just autentificate ? */
+			LOG.error("ERROR in getting order: ", throwable);
+
+			BitmexStreamingMarketDataService streamingMarketDataService = (BitmexStreamingMarketDataService) exchange.getStreamingMarketDataService();
+			streamingMarketDataService.getRawOrder().subscribe(BitmexManualExample::handleOrderMessage, BitmexManualExample::handleSomeException);
+
+		}
+		LOG.error("ubheandled ERROR in getting order: ", throwable);
+	}
+
+	private static void handleOrderMessage(BitmexPrivateOrder bitmexOrder) {
+        LOG.info("Order: {}", bitmexOrder);
     }
 
     /* Trader position listener example */

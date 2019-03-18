@@ -4,6 +4,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.knowm.xchange.bitmex.BitmexException;
+import org.knowm.xchange.bitmex.dto.marketdata.BitmexPrivateOrder;
 import org.knowm.xchange.bitmex.dto.trade.BitmexOrder;
 import org.knowm.xchange.bitmex.dto.trade.BitmexPosition;
 
@@ -80,10 +82,20 @@ public class BitmexWebSocketTransaction {
         return bitmexPosition;
     }
 
-    public BitmexOrder toBitmexOrder() {
-        BitmexOrder bitmexOrder = null;
+    public BitmexPrivateOrder toBitmexPrivateOrder() {
+        BitmexPrivateOrder bitmexOrder = null;
         try {
-            bitmexOrder = mapper.readValue(data.get(0).toString(), BitmexOrder.class);
+            bitmexOrder = mapper.readValue(data.get(0).toString(), BitmexPrivateOrder.class);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return bitmexOrder;
+    }
+
+    public BitmexException toBitmexEception() {
+        BitmexException bitmexOrder = null;
+        try {
+            bitmexOrder = mapper.readValue(data.get(0).toString(), BitmexException.class);
         } catch (IOException e) {
             e.printStackTrace();
         }

@@ -10,6 +10,7 @@ import io.netty.handler.codec.http.websocketx.extensions.compression.WebSocketCl
 import io.reactivex.Completable;
 import org.apache.commons.lang3.StringUtils;
 import org.knowm.xchange.ExchangeSpecification;
+import org.knowm.xchange.bitmex.dto.trade.BitmexOrder;
 import org.knowm.xchange.bitmex.service.BitmexDigest;
 import org.knowm.xchange.utils.nonce.ExpirationTimeFactory;
 import org.slf4j.Logger;
@@ -24,6 +25,8 @@ import info.bitrich.xchangestream.bitmex.dto.BitmexWebSocketTransaction;
 import info.bitrich.xchangestream.service.netty.JsonNettyStreamingService;
 import io.reactivex.Observable;
 import si.mazi.rescu.SynchronizedValueFactory;
+
+import javax.naming.NoPermissionException;
 
 /**
  * Created by Lukas Zaoralek on 13.11.17.
@@ -53,9 +56,7 @@ public class BitmexStreamingService extends JsonNettyStreamingService {
             String error = message.get("error").asText();
 
             if(StringUtils.equals("User requested an account-locked subscription but no authorization was provided.", error)){
-                /*TO*/
-                super.handleMessage(message);
-                authenticate();
+                super.handleError(message, new NoPermissionException(error));
                 return;
             }
 
@@ -95,9 +96,16 @@ public class BitmexStreamingService extends JsonNettyStreamingService {
 
     @Override
     protected String getChannelNameFromMessage(JsonNode message) throws IOException {
+        if(message.has("error")){
+            return message.get("request").get("args").get(0).asText();
+        }
+
         String instrument = message.get("data").get(0).get("symbol").asText();
         String table = message.get("table").asText();
         if("position".equals(table)){
+            return table;
+        }
+        if("order".equals(table)){
             return table;
         }
         return String.format("%s:%s", table, instrument);
@@ -105,7 +113,7 @@ public class BitmexStreamingService extends JsonNettyStreamingService {
 
     @Override
     public String getSubscribeMessage(String channelName, Object... args) throws IOException {
-        if(BitmexChannel.getBitmexPrivateChannels().contains(channelName)){
+        if(BitmexChannel.getBitmexPrivateChannelsNames().contains(channelName)){
             authenticate();
         }
         BitmexWebSocketSubscriptionMessage subscribeMessage = new BitmexWebSocketSubscriptionMessage("subscribe", new String[]{channelName});

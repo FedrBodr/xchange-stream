@@ -29,7 +29,15 @@ public enum BitmexChannel {
 		return auth;
 	}
 
+	public String getName() {
+		return name;
+	}
+
 	public static Set<BitmexChannel> getBitmexPrivateChannels() {
 		return Stream.of(values()).filter(BitmexChannel::isAuth).collect(Collectors.toSet());
+	}
+
+	public static Set<String> getBitmexPrivateChannelsNames() {
+		return Stream.of(values()).filter(BitmexChannel::isAuth).map(BitmexChannel::getName).collect(Collectors.toSet());
 	}
 }
